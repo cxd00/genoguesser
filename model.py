@@ -9,7 +9,6 @@ class GenoLoc(lightning.LightningModule):
         super().__init__()
         self.embedding_summary = microsat_summary
         self.embedding_layers = [] 
-        self.reshape_layers = []
         self.total_emb_features = 0
         
         for unique_cats in self.embedding_summary:
@@ -33,24 +32,29 @@ class GenoLoc(lightning.LightningModule):
         self.ln.append(torch.nn.Linear(256, 2))
         self.ln.append(torch.nn.Linear(2, 2))
 
+        self.embedding_layers = torch.nn.ModuleList(self.embedding_layers)
+        self.ln = torch.nn.ModuleList(self.ln)
+
 
     def forward(self, x):
         emb_outputs = []
-        for vec, emb in zip(x, self.embedding_layers):
+        for idx, emb in enumerate(self.embedding_layers):
+            vec = x[:, idx, :self.embedding_summary[idx]]
             emb_outputs.append(emb(vec))
 
-        x = torch.cat(emb_outputs, axis=0)
+        x = torch.cat(emb_outputs, dim=1)
         for lyr in self.ln:
             x = lyr(x)
         return x
 
     
     def training_step(self, batch, batch_idx):
-        inputs, targets = batch
+        inputs = batch["genotype"]
+        targets = batch["location"]
         outputs = self(inputs)
         loss = self.euclidean_distance_loss(outputs, targets)
         if batch_idx == 20:
-            self.log("train loss", loss)
+            print(loss)
         return loss
 
     
