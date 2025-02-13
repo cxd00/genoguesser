@@ -14,23 +14,23 @@ class GenoLoc(torch.nn.Module):
         for unique_cats in self.embedding_summary:
             output_dim = int(np.sqrt(int(unique_cats)))
             self.total_emb_features += output_dim
-            emb = torch.nn.Linear(unique_cats, output_dim)
+            emb = torch.nn.Embedding(unique_cats, output_dim)
             self.embedding_layers.append(emb)
             # self.reshape_layers.append(torch.nn.Flatten())
 
         self.bn = torch.nn.BatchNorm1d(self.total_emb_features)
         self.ln = []
         self.ln.append(torch.nn.Linear(self.total_emb_features, 256))
+        # self.ln.append(torch.nn.BatchNorm1d(256))
         for i in range(2):
             self.ln.append(torch.nn.Linear(256, 256))
             self.ln.append(torch.nn.ELU())
-        self.ln.append(torch.nn.Dropout(p=0.25))
-        self.ln.append(torch.nn.BatchNorm1d(256))
-        for i in range(2):
+        self.ln.append(torch.nn.Dropout(p=0.3))
+        # self.ln.append(torch.nn.BatchNorm1d(256))
+        for i in range(3):
             self.ln.append(torch.nn.Linear(256, 256))
             self.ln.append(torch.nn.ELU())
-        self.ln.append(torch.nn.Dropout(p=0.25))
-        self.ln.append(torch.nn.BatchNorm1d(256))
+        self.ln.append(torch.nn.Dropout(p=0.3))
 
         self.ln.append(torch.nn.Linear(256, 2))
         self.ln.append(torch.nn.Linear(2, 2))
@@ -43,14 +43,9 @@ class GenoLoc(torch.nn.Module):
 
 
     def forward(self, x):
-        emb_outputs = []
-        for idx, emb in enumerate(self.embedding_layers):
-            vec = x[:, idx, :self.embedding_summary[idx]]
-            emb_outputs.append(emb(vec))
-
-        x = emb_outputs
+        x = [emb(x[:,idx]) for idx, emb in enumerate(self.embedding_layers)]
         x = torch.cat(x, dim=1)
-        # x = self.bn(x)
+        x = self.bn(x)
         for lyr in self.ln:
             x = lyr(x)
         return x
